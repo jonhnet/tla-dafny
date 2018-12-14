@@ -1,5 +1,5 @@
-include "Lift.j.dfy"
-include "Induction.j.dfy"
+include "Lift.i.dfy"
+include "Induction.i.dfy"
 include "DafnyPatches.s.dfy"
 
 module Jon__leasedCounter_i {
@@ -202,8 +202,7 @@ function IncrementAtClient(i: int) : Action<System>
     (s,s') => Increment(s, s', i)
 }
 
-lemma 
-
+/*
 lemma LeaseAtRotation(i: int, j: int)
     requires sat(Spec())
     ensures sat(leadsto(LeaseAt(i), LeaseAt(j)));
@@ -228,7 +227,6 @@ lemma InferIncrementIsFair(i: int)
     }
 }
 
-// prove forall i always eventually Waiting(i) ==> always eventually Count(i)
-// What is want I? I guess a ready action.
+*/
 
 }

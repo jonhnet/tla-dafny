@@ -1,4 +1,4 @@
-include "Temporal.j.dfy"
+include "Temporal.s.dfy"
 
 module Temporal__Lift_j {
     import opened Temporal__Temporal_j

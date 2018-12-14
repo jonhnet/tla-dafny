@@ -1,5 +1,5 @@
-include "Temporal.j.dfy"
-include "Lift.j.dfy"
+include "Temporal.s.dfy"
+include "Lift.i.dfy"
 
 module Temporal__Induction_j {
     import opened Temporal__Temporal_j
