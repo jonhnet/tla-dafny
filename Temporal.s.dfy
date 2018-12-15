@@ -1,6 +1,6 @@
 include "DafnyPatches.s.dfy"
 
-module Temporal__Temporal_j {
+module Temporal__Temporal_s {
     import opened DafnyPatches_s
 
     type temporal = int -> bool
@@ -70,5 +70,10 @@ module Temporal__Temporal_j {
     function leadsto(f:temporal, g:temporal) : temporal
     {
         always(implies(f, eventually(g)))
+    }
+
+    function until(f:temporal, g:temporal) : temporal
+    {
+        always(implies(f, or(prime(f), g)))
     }
 } 

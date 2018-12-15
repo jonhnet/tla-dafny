@@ -1,7 +1,7 @@
 include "Temporal.s.dfy"
 
-module Temporal__Lift_j {
-    import opened Temporal__Temporal_j
+module Temporal__Lift_i {
+    import opened Temporal__Temporal_s
 
     type StatePredicate<!S> = S -> bool
     type Action<!S> = (S,S) -> bool

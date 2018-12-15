@@ -1,9 +1,9 @@
 include "Temporal.s.dfy"
 include "Lift.i.dfy"
 
-module Temporal__Induction_j {
-    import opened Temporal__Temporal_j
-    import opened Temporal__Lift_j
+module Temporal__Induction_i {
+    import opened Temporal__Temporal_s
+    import opened Temporal__Lift_i
 
     lemma InvariantByInduction_helper(init:temporal, next:temporal,
         inv:temporal, k:int)

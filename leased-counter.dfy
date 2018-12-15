@@ -1,11 +1,13 @@
 include "Lift.i.dfy"
 include "Induction.i.dfy"
 include "DafnyPatches.s.dfy"
+include "Liveness.i.dfy"
 
 module Jon__leasedCounter_i {
-import opened Temporal__Temporal_j
-import opened Temporal__Lift_j
-import opened Temporal__Induction_j
+import opened Temporal__Temporal_s
+import opened Temporal__Lift_i
+import opened Temporal__Induction_i
+import opened Temporal__Liveness_i
 import opened DafnyPatches_s
 
 datatype Node = Node(count:int, lease:bool, active:bool)
@@ -192,41 +194,75 @@ lemma InferAlwaysInv()
 // A liveness property
 ////////////////////////////////////////
 
-function WaitingAtClient(i: int) : StatePredicate<System>
+function WaitingAt(i: int) : StatePredicate<System>
 {
     s => Waiting(s, i)
 }
 
-function IncrementAtClient(i: int) : Action<System>
+function IncrementAt(i: int) : Action<System>
 {
     (s,s') => Increment(s, s', i)
 }
 
-/*
+function LeaseAt(i: int) : StatePredicate<System>
+{
+    (s:System) => 0<=i<|s.n| && s.n[i].lease
+}
+
 lemma LeaseAtRotation(i: int, j: int)
     requires sat(Spec())
-    ensures sat(leadsto(LeaseAt(i), LeaseAt(j)));
+    ensures sat(leadsto(Lift(LeaseAt(i)), Lift(LeaseAt(j))));
 {
 }
 
-lemma LeaseAtLeadsToIncrement(i: int)
+lemma LeaseEverywhere(i: int)
     requires sat(Spec())
-    ensures sat(leadsto(and(LeaseAt(i), WaitingAtClient(i)), IncrementAtClient(i)));
+    ensures sat(always(eventually(Lift(LeaseAt(i)))))
+{
+}
+
+lemma WaitingUntilIncrement(i: int)
+    ensures sat(always(until(Lift(WaitingAt(i)), LiftAction(IncrementAt(i)))));
+{
+    assert forall s, s' :: WaitingAt(i)(s) ==> IncrementAt(i)(s, s');
+    var WaitingImpliesIncrement :=
+        (s, s') => WaitingAt(i)(s) ==> IncrementAt(i)(s, s');
+    InferAlways(WaitingImpliesIncrement);
+    assert sat(always(LiftAction(WaitingImpliesIncrement)));
+    assert sat(always(until(Lift(WaitingAt(i)), LiftAction(IncrementAt(i)))));
+}
+
+lemma IncrementBeforeGrant(i: int)
+    ensures sat(always(implies(and(Lift(WaitingAt(i)), Lift(WaitingAt(i))),
+        LiftAction(IncrementAt(i)))));
 {
 }
 
 lemma InferIncrementIsFair(i: int)
     requires sat(Spec())
     ensures sat(implies(
-        always(eventually(Lift(WaitingAtClient(i)))),
-        always(eventually(LiftAction(IncrementAtClient(i))))
+        always(eventually(Lift(WaitingAt(i)))),
+        always(eventually(LiftAction(IncrementAt(i))))
         ));
 {
-    if (sat(always(eventually(Lift(WaitingAtClient(i)))))) {
-        assert sat(always(eventually(LiftAction(IncrementAtClient(i)))));
+    if (sat(always(eventually(Lift(WaitingAt(i)))))) {
+        WaitingUntilIncrement(i);
+        assert sat(
+            always(until(Lift(WaitingAt(i)), LiftAction(IncrementAt(i)))));
+        LeaseEverywhere(i);
+        assert sat(
+            always(eventually(Lift(LeaseAt(i)))));
+        IncrementBeforeGrant(i);
+        assert sat(always(implies(and(Lift(WaitingAt(i)), Lift(WaitingAt(i))),
+            LiftAction(IncrementAt(i)))));
+        InferFromUntil(Lift(WaitingAt(i)),
+            Lift(WaitingAt(i)), LiftAction(IncrementAt(i)));
+        assert sat(leadsto(Lift(WaitingAt(i)), LiftAction(IncrementAt(i))));
+        InferInfinitelyOften(Lift(WaitingAt(i)), LiftAction(IncrementAt(i)));
+        assert sat(
+             always(eventually(LiftAction(IncrementAt(i)))));
     }
 }
 
-*/
 
 }
