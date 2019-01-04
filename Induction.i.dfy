@@ -63,4 +63,21 @@ module Temporal__Induction_i {
             LiftInvariant_helper(init, next, inv, j);
         }
     }
+
+    // TODO suprised we need this
+    lemma alwaysPropagation(f:temporal, g:temporal)
+        requires sat(always(f));
+        requires sat(f) == sat(g);
+        ensures sat(always(g));
+    {
+        forall j | 0 <= j
+            ensures g(j)
+        {
+            assert f(j);
+            // OH! this is the metalogical disaster! Since we can't see
+            // the implicit quantifier over i, we can't actually conclude
+            // that f and g are 
+            assert g(j);
+        }
+    }
 }

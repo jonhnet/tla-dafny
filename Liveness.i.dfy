@@ -16,6 +16,8 @@ module Temporal__Liveness_i {
         requires sat(always(implies(and(f, g), h)))
         ensures sat(leadsto(g, h))
     {
+        // I don't know if this proof rule is actually right. I should
+        // probably read the inference rules in Specifying Systems...
     }
 
     lemma InferInfinitelyOften(f:temporal, g:temporal)
@@ -23,5 +25,7 @@ module Temporal__Liveness_i {
         requires sat(leadsto(f, g))
         ensures sat(always(eventually(g)))
     {
+        // I don't know if this proof rule is actually right. I should
+        // probably read the inference rules in Specifying Systems...
     }
 }

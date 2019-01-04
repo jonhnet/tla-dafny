@@ -10,7 +10,7 @@ import opened Temporal__Induction_i
 import opened Temporal__Liveness_i
 import opened DafnyPatches_s
 
-datatype Node = Node(count:int, lease:bool, active:bool)
+datatype Node = Node(count:int, lease:bool, waiting:bool)
 
 datatype System = System(n:seq<Node>)
 
@@ -19,30 +19,32 @@ predicate Init(s:System) {
     && 0<|s.n|
 }
 
-datatype Step = IncrementStep(i: int) | GrantStep(i: int, j: int)
+datatype Step = AppRequestStep(i: int) | IncrementStep(i: int) | GrantStep(i: int, j: int)
 
-predicate AppActivity(s:System, s':System, i:int) {
+predicate AppRequest(s:System, s':System, i:int) {
     && 0 <= i < |s.n|
     && |s'.n| == |s.n|
+    && !s.n[i].waiting
     && (forall j :: 0<=j<|s'.n| && j!=i ==> s'.n[j]==s.n[j])
     && s'.n[i].count == s.n[i].count
     && s'.n[i].lease == s.n[i].lease
-    && s'.n[i].active == true
+    && s'.n[i].waiting == true
 }
 
 predicate Waiting(s:System, i:int) {
     && 0 <= i < |s.n|
-    && s.n[i].active
+    && s.n[i].waiting
 }
 
 predicate Increment(s:System, s':System, i:int) {
     && 0 <= i < |s.n|
     && s.n[i].lease
     && |s'.n| == |s.n|
+    && s.n[i].waiting
     && (forall j :: 0<=j<|s'.n| && j!=i ==> s'.n[j]==s.n[j])
     && s'.n[i].count == s.n[i].count + 1
     && s'.n[i].lease == s.n[i].lease
-    && s'.n[i].active == false
+    && s'.n[i].waiting == false
 }
 
 predicate Grant(s:System, s':System, i:int, j:int) {
@@ -50,6 +52,7 @@ predicate Grant(s:System, s':System, i:int, j:int) {
     && 0 <= j < |s.n|
     && i != j
     && s.n[i].lease
+    && !s.n[i].waiting
     && |s'.n| == |s.n|
     && (forall k :: 0<=k<|s'.n| && k!=i && k!=j ==> s'.n[k]==s.n[k])
     && s'.n[i].lease == false
@@ -57,8 +60,8 @@ predicate Grant(s:System, s':System, i:int, j:int) {
 
     && s'.n[j].count == s.n[i].count
 
-    && s'.n[i].active == false
-    && s'.n[j].active == true
+    && s'.n[i].waiting == s.n[i].waiting    // ==false
+    && s'.n[j].waiting == s.n[j].waiting
 }
 
 predicate Next(s:System, s':System) {
@@ -67,6 +70,7 @@ predicate Next(s:System, s':System) {
 
 predicate NextStep(s:System, s':System, step: Step) {
     match step
+        case AppRequestStep(i) => AppRequest(s, s', i)
         case IncrementStep(i) => Increment(s, s', i)
         case GrantStep(i, j) => Grant(s, s', i, j)
 }
@@ -102,11 +106,14 @@ lemma lemmaExactlyOneLeaseNext(s: System, s': System, step: Step)
 {
     var i :| OneNodeHoldsLease(s, i);
     match step
-        case IncrementStep(i) => {
+        case AppRequestStep(j) => {
             assert OneNodeHoldsLease(s', i);
         }
-        case GrantStep(i, j) => {
+        case IncrementStep(j) => {
             assert OneNodeHoldsLease(s', j);
+        }
+        case GrantStep(j, k) => {
+            assert OneNodeHoldsLease(s', k);
         }
 }
 
@@ -160,6 +167,20 @@ lemma InferAlwaysInv()
         var holder := LeaseHolder(s);
         var step :| NextStep(s, s', step);
         match step
+            case AppRequestStep(k) => {
+                reveal_LeaseHolders();
+                var hs := LeaseHolders(s);
+                var i :| i in hs;
+                forall j | j!=i
+                    ensures !(j in LeaseHolders(s'))
+                {
+                    if j in LeaseHolders(s') {
+                        assert {i,j} <= LeaseHolders(s);
+                    }
+                }
+                assert LeaseHolders(s') == {i};
+                assert Inv(s');
+            }
             case IncrementStep(i) => {
                 reveal_LeaseHolders();
                 forall j | j!=i
@@ -213,18 +234,37 @@ lemma LeaseAtRotation(i: int, j: int)
     requires sat(Spec())
     ensures sat(leadsto(Lift(LeaseAt(i)), Lift(LeaseAt(j))));
 {
+    assume false;   // TODO
 }
 
 lemma LeaseEverywhere(i: int)
     requires sat(Spec())
     ensures sat(always(eventually(Lift(LeaseAt(i)))))
 {
+    assume false;   // TODO
 }
 
 lemma WaitingUntilIncrement(i: int)
+    requires sat(Spec())
     ensures sat(always(until(Lift(WaitingAt(i)), LiftAction(IncrementAt(i)))));
 {
-    assert forall s, s' :: WaitingAt(i)(s) ==> IncrementAt(i)(s, s');
+    forall s, s' | Next(s, s') && WaitingAt(i)(s) && LeaseAt(i)(s)
+        ensures IncrementAt(i)(s, s')
+    {
+        assert Next(s, s');
+        var step :| NextStep(s, s', step);
+        match step
+            case AppRequestStep(j) => {
+                assert AppRequest(s, s', j);
+                assert false;
+            }
+            case IncrementStep(j) => {
+                assert IncrementAt(i)(s, s');
+            }
+            case GrantStep(j, k) => {
+                assert false;
+            }
+    }
     var WaitingImpliesIncrement :=
         (s, s') => WaitingAt(i)(s) ==> IncrementAt(i)(s, s');
     InferAlways(WaitingImpliesIncrement);
@@ -236,6 +276,18 @@ lemma IncrementBeforeGrant(i: int)
     ensures sat(always(implies(and(Lift(WaitingAt(i)), Lift(WaitingAt(i))),
         LiftAction(IncrementAt(i)))));
 {
+    var action := (s, s') =>
+        WaitingAt(i)(s) && WaitingAt(i)(s) ==> IncrementAt(i)(s, s');
+    assert forall s, s' :: action(s, s');
+    InferAlways(action);
+    assert sat(always(LiftAction(action)));
+    calc {
+        sat(LiftAction(action));
+        sat(implies(and(Lift(WaitingAt(i)), Lift(WaitingAt(i))),
+            LiftAction(IncrementAt(i))));
+    }
+    assert sat(always(implies(and(Lift(WaitingAt(i)), Lift(WaitingAt(i))),
+        LiftAction(IncrementAt(i)))));
 }
 
 lemma InferIncrementIsFair(i: int)
