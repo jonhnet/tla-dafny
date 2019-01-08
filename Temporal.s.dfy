@@ -72,8 +72,39 @@ module Temporal__Temporal_s {
         always(implies(f, eventually(g)))
     }
 
+    function enabled(f:temporal) : temporal
+    {
+        // Well, this will be tricky to write without concrete states!
+        // We want to talk about a hypothetical next state, not necessarily
+        // any state in the ambient behavior. Yuck.
+//        i => exsits state' : f(state[i], state')
+        f
+    }
+
+    // XXX This isn't really Lamport Weak Fairness yet
+    // (Specifying Systems page 97), because it mentions f,
+    // not <f>_v. I think the _v bit is about building modular specs,
+    // or refine-able specs, so I think we can defer it for a little bit.
+    function WF(f:temporal) : temporal
+    {
+        always(implies(always(enabled(f)), eventually(f)))
+    }
+
     function until(f:temporal, g:temporal) : temporal
     {
         always(implies(f, or(prime(f), g)))
+    }
+
+    type QuantifierConstraint<!T> = T -> bool
+    type QuantifiedTemporal<!T> = T -> temporal
+
+    function Forall<T(!new)>(r:QuantifierConstraint<T>, f:QuantifiedTemporal<T>) : temporal
+    {
+        i => forall t :: r(t) ==> f(t)(i)
+    }
+
+    function {:opaque} Exists<T(!new)>(r:QuantifierConstraint<T>, f:QuantifiedTemporal<T>) : temporal
+    {
+        i => forall j :: i <= j ==> exists t :: r(t) && f(t)(j)
     }
 } 

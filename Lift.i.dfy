@@ -32,4 +32,13 @@ module Temporal__Lift_i {
     {
         reveal_LiftAction();
     }
+
+    lemma InferUntil<S>(init:StatePredicate<S>, next:Action<S>,
+        f:StatePredicate<S>, g:StatePredicate<S>)
+        requires forall s, s' :: next(s, s') && f(s) ==> (f(s) || g(s))
+        requires sat(LiftSpec(init, next))
+        ensures sat(until(Lift(f), Lift(g)))
+    {
+    }
+
 }

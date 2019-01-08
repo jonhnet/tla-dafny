@@ -47,7 +47,14 @@ predicate Increment(s:System, s':System, i:int) {
     && s'.n[i].waiting == false
 }
 
-predicate Grant(s:System, s':System, i:int, j:int) {
+function successor(s:System, i:int) : (j:int)
+    requires 0 < |s.n|
+{
+    (i+1) % |s.n|
+}
+
+predicate Grant(s:System, s':System, i:int) {
+    var j := successor(i);
     && 0 <= i < |s.n|
     && 0 <= j < |s.n|
     && i != j
@@ -230,11 +237,66 @@ function LeaseAt(i: int) : StatePredicate<System>
     (s:System) => 0<=i<|s.n| && s.n[i].lease
 }
 
+function GrantAt(i: int) : Action<System>
+{
+    (s,s') => Grant(s, s', i)
+}
+
+function v() : StateFunction<System>
+{
+    (s) => s
+}
+
+lemma WFGrant(i: int)
+    ensures sat(implies(eventually(always(enabled(LiftChanging(GrantAt, v)))),
+                        always(eventually(LiftChanging(GrantAt, v)))))
+{
+    assume false;   // an assumption.
+}
+
+lemma LeaseAtRotationRollover()
+    requires sat(Spec())
+    requires i < j;
+    ensures sat(leadsto(Lift(LeaseAt(last)), Lift(LeaseAt(0))));
+{
+    // TODO: No always (box).
+    WFGrant(last);
+    assert sat(prime(Lift(LeaseAt(0))));
+}
+
+lemma LeaseAtRotationOrdered(i: int, j: int)
+    requires sat(Spec())
+    requires i < j;
+    ensures sat(leadsto(Lift(LeaseAt(i)), Lift(LeaseAt(j))));
+    decreases j-i;
+{
+    // TODO: No always (box).
+    if (i + 1 == j) {
+        WFGrant(i);
+        assert sat(prime(Lift(LeaseAt(j))));
+    } else {
+        LeaseAtRotationOrdered(i, i+1);
+        LeaseAtRotationOrdered(i+1, j);
+        leadstoTransitivity(
+            Lift(LeaseAt(i)), Lift(LeaseAt(i+1)), Lift(LeaseAt(j)));
+    }
+}
+
 lemma LeaseAtRotation(i: int, j: int)
     requires sat(Spec())
     ensures sat(leadsto(Lift(LeaseAt(i)), Lift(LeaseAt(j))));
 {
-    assume false;   // TODO
+    if (i < j) {
+        LeaseAtRotationOrdered(i, j);
+    } else {
+        LeaseAtRotationOrdered(i, last);
+        LeaseAtRotationRollover(last, 0);
+        LeaseAtRotationOrdered(0, j);
+        leadstoTransitivity(
+            Lift(LeaseAt(i)), Lift(LeaseAt(last)), Lift(LeaseAt(0)));
+        leadstoTransitivity(
+            Lift(LeaseAt(i)), Lift(LeaseAt(0)), Lift(LeaseAt(j)));
+    }
 }
 
 lemma LeaseEverywhere(i: int)
